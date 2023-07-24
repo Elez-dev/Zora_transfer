@@ -5,17 +5,34 @@ import random
 from threading import Thread
 from web3.exceptions import TransactionNotFound
 
-value_send_min = 0.0001
-value_send_max = 0.001
+value_send_min = 0.00001                                               # Минимальное и
+value_send_max = 0.00003                                               # Максимальное количество эфира для отправки самому себе - возьмёт рандомное среднее
 
-number_transactions_min = 2
-number_transactions_max = 3
+number_transactions_min = 10                                           # Минимальное и
+number_transactions_max = 20                                           # Максимальное количество транзакций на аккаунт - одна транза стоит примерно 5-7 центов 
 
-time_delay_min = 10
-time_delay_max = 20
+time_delay_min = 5                                                     # Минимальное и
+time_delay_max = 10                                                    # Максимальное время задержки между транзакциями
 
-number_of_thread = 1
-RPC = 'https://rpc.zora.co/'
+number_of_thread = 1                                                   # Количество потоков(акков, которые будут работать одновременно)
+RPC_ZORA = 'https://rpc.zora.co/'                                      # RPC, если не работает эта -- можете попробовать эту: https://rpc.zora.energy/
+RPC_ETH = 'https://rpc.ankr.com/eth'
+MAX_GAS_ETH = 30                                                       # Максимальный газ в сети Ethereum, если он больше заданного, скрипт спит
+
+
+def chek_gas_eth(max_gas):
+    try:
+        eth_w3 = Web3(Web3.HTTPProvider(RPC_ETH, request_kwargs={'timeout': 60}))
+        while True:
+            res = int(round(Web3.from_wei(eth_w3.eth.gas_price, 'gwei')))
+            print(f'Газ сейчас - {res} gwei\n')
+            if res <= max_gas:
+                break
+            else:
+                time.sleep(100)
+                continue
+    except:
+        return 0
 
 
 class Zora:
@@ -42,7 +59,7 @@ class Zora:
                 'to': self.address_wallet,
                 'value': value,
                 'nonce': self.web3.eth.get_transaction_count(self.address_wallet),
-                'gasPrice': Web3.to_wei(0.005, 'gwei'),
+                'gasPrice': Web3.to_wei(0.005, 'gwei'),                        # газ, тут и так стоит минмальный, но если хотите больше можете увеличить
                 'gas': 100000
             }
             gas = self.web3.eth.estimate_gas(txn)
@@ -103,7 +120,7 @@ class Worker(Thread):
     def run(self):
         while keys_list:
             private_key = keys_list.pop(0)
-            web3 = Web3(Web3.HTTPProvider(RPC, request_kwargs={'timeout': 60}))
+            web3 = Web3(Web3.HTTPProvider(RPC_ZORA, request_kwargs={'timeout': 60}))
             number_thread = threading.current_thread().name
             address = web3.eth.account.from_key(private_key).address
             print('----------------------------------------------------------------------------')
@@ -113,6 +130,7 @@ class Worker(Thread):
             number_repetitions = random.randint(number_transactions_min, number_transactions_max)
             zora = Zora(private_key, web3, number_thread)
             for _ in range(number_repetitions):
+                chek_gas_eth(MAX_GAS_ETH)
                 value_send = random.uniform(value_send_min, value_send_max)
                 res = zora.send(value_send)
                 if res == 'balance':
